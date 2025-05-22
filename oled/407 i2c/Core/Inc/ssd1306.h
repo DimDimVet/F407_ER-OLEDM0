@@ -52,6 +52,14 @@ SDA        |PB7          |Serial data line
 #include "stdlib.h"
 #include "string.h"
 
+#define ENABLE_BIT(reg, bit) ((reg) |= (bit))
+#define DISABLE_BIT(reg, bit) ((reg) &= ~(bit))
+#define Read_BIT(reg, bit)    ((reg) & (bit))
+
+#define I2C_FLAG_MASK                    0x0000FFFFU
+uint8_t I2C_GET_FLAG(I2C_TypeDef *instance, uint32_t flag);
+
+
 
 /* I2C address */
 #ifndef SSD1306_I2C_ADDR
