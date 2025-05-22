@@ -94,7 +94,7 @@ int main(void)
 	SSD1306_Init();
   /* USER CODE END 2 */
 	SSD1306_GotoXY(20,0);
-	SSD1306_Puts ("tts1", &Font_11x18, 1);
+	SSD1306_Puts ("tts", &Font_11x18, 1);
 	SSD1306_GotoXY(10,30);
 	SSD1306_Puts ("TestTest", &Font_16x26, 1);
 	SSD1306_UpdateScreen();

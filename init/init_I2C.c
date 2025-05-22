@@ -184,37 +184,37 @@ uint8_t I2C_RX_SetTime()
   return 0;
 }
 
-uint8_t I2C_GET_FLAG(uint32_t flag_BTF)
-{
+//uint8_t I2C_GET_FLAG(uint32_t flag_BTF)
+//{
 
-  if (((uint8_t)(flag_BTF >> 16U)) == 0x01U)
-  {
-    if (((I2C1->SR1) & (flag_BTF & I2C_FLAG_MASK)) == (flag_BTF & I2C_FLAG_MASK))
-    {
-      return 1;
-    }
-    else
-    {
-      return 0;
-    }
-  }
-  else
-  {
-    if (((I2C1->SR2) & (flag_BTF & I2C_FLAG_MASK)) == (flag_BTF & I2C_FLAG_MASK))
-    {
-      return 1;
-    }
-    else
-    {
-      return 0;
-    }
-  }
-}
+//  if (((uint8_t)(flag_BTF >> 16U)) == 0x01U)
+//  {
+//    if (((I2C1->SR1) & (flag_BTF & I2C_FLAG_MASK)) == (flag_BTF & I2C_FLAG_MASK))
+//    {
+//      return 1;
+//    }
+//    else
+//    {
+//      return 0;
+//    }
+//  }
+//  else
+//  {
+//    if (((I2C1->SR2) & (flag_BTF & I2C_FLAG_MASK)) == (flag_BTF & I2C_FLAG_MASK))
+//    {
+//      return 1;
+//    }
+//    else
+//    {
+//      return 0;
+//    }
+//  }
+//}
 
 uint8_t I2C_BUSYBit_SetTime() // I2C_FLAG_BUSY=25
 {
   // ждем передачу данных
-  while (I2C_GET_FLAG(I2C_FLAG_BUSY) == I2C_TIMEOUT_BUSY_FLAG)
+  while (I2C_GET_FLAG(I2C1,I2C_FLAG_BUSY) == I2C_TIMEOUT_BUSY_FLAG)
   {
   }
   return 0;
@@ -347,7 +347,7 @@ uint8_t I2C_Master_ReceiveT(uint16_t DevAddress, uint8_t *pData, uint16_t Size)
       pData++;
       Size--;
 
-      if (I2C_GET_FLAG(I2C_FLAG_BTF) == SET)
+      if (I2C_GET_FLAG(I2C1,I2C_FLAG_BTF) == SET)
       {
         /* Read data from DR */
         *pData = (uint8_t)I2C1->DR;
@@ -410,127 +410,202 @@ uint8_t I2C_Master_TransmitT(uint16_t DevAddress, uint8_t *pData, uint16_t Size)
 
   return 0;
 }
+/*--------------------------------------*/
+uint8_t I2C_GET_FLAG(I2C_TypeDef *instance, uint32_t flag)
+{
+	if((flag >> 16) == 1)
+	{
+		if(((instance->SR1) & (flag & I2C_FLAG_MASK)) == (flag & I2C_FLAG_MASK))
+		{
+			return 1;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+	else
+	{
+		if(((instance->SR2) & (flag & I2C_FLAG_MASK)) == (flag & I2C_FLAG_MASK))
+		{
+			return 1;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+}
 
-int I2C_IsDeviceReady(uint16_t DevAddress, uint32_t Trials, uint32_t Timeout)
+
+void I2C_CLEAR_FLAG(I2C_TypeDef *instance, uint32_t flag)
+{
+	instance->SR1 = ~ (flag & I2C_FLAG_MASK);
+}
+
+uint8_t I2C_WaitOnFlagUntilTimeout(I2C_TypeDef *instance, uint32_t flag, FlagStatus Status, uint32_t Timeout)
+{
+	uint32_t Time_count;
+  /* Wait until flag is set */
+  while (I2C_GET_FLAG(instance, flag) == Status)
+  {
+    /* Check for the Timeout */
+    if (Timeout != MAX_DELAY)
+    {
+			//подумать проверку на ошибку
+//			if(Time_count > Timeout)
+//			{
+//				return 1;
+//			}
+//			Time_count++;
+    }
+  }
+  return 0;
+}
+
+void I2C_ENABLE(I2C_TypeDef *instance)
+{
+	/* Check if the I2C is already enabled */
+	if((instance->CR1 & I2C_CR1_PE) != I2C_CR1_PE)
+	{
+		instance->CR1 |= 1 << I2C_CR1_PE_Pos;
+	}
+}	
+
+
+uint8_t I2C_7BIT_ADD_Write(uint8_t DevAddress)
+{
+	return (uint8_t)(DevAddress & (~I2C_OAR1_ADD0));
+}
+
+void I2C_CLEAR_ADDRFLAG(I2C_TypeDef *instance)
+{
+	  do{                                           
+    uint32_t tmpreg = 0;               
+    tmpreg = instance->SR1;       
+    tmpreg = instance->SR2;       
+    //UNUSED(tmpreg);                             
+  } while(0);
+} 
+
+
+uint8_t I2C_IsDeviceReady(I2C_TypeDef *instance, uint16_t DevAddress, uint32_t Trials, uint32_t Timeout)
 {
   /* Get tick */
   //uint32_t tickstart = HAL_GetTick();
-  uint32_t I2C_Trials = 0U;
+  uint32_t I2C_Trials = 0;
   FlagStatus tmp1;
   FlagStatus tmp2;
 
 //  if (hi2c->State == HAL_I2C_STATE_READY)
 //  {
     /* Wait until BUSY flag is reset */
-		I2C_BUSYBit_SetTime();
-//    if (I2C_WaitOnFlagUntilTimeout(hi2c, I2C_FLAG_BUSY, SET, I2C_TIMEOUT_BUSY_FLAG, tickstart) != HAL_OK)
-//    {
-//      return HAL_BUSY;
-//    }
+    if (I2C_WaitOnFlagUntilTimeout(instance, I2C_FLAG_BUSY, SET, I2C_TIMEOUT_BUSY_FLAG) != 0)
+    {
+      //return HAL_BUSY;
+			return 2;
+    }
 
+    /* Process Locked */
+    //__HAL_LOCK(hi2c);
 
-//    /* Process Locked */
-//    __HAL_LOCK(hi2c);
-
-    /* Check if the I2C is already enabled */
-//    if (( I2C1->CR1 & I2C_CR1_PE) != I2C_CR1_PE)
+//    /* Check if the I2C is already enabled */
+//    if ((hi2c->Instance->CR1 & I2C_CR1_PE) != I2C_CR1_PE)
 //    {
 //      /* Enable I2C peripheral */
-//      //__HAL_I2C_ENABLE(hi2c);
+//      __HAL_I2C_ENABLE(hi2c);
 //    }
+		I2C_ENABLE(instance);
 
-//    /* Disable Pos */
-    I2C1->CR1 |= 0 << I2C_CR1_POS_Pos;
-//    CLEAR_BIT(hi2c->Instance->CR1, I2C_CR1_POS);
-
-//    hi2c->State = HAL_I2C_STATE_BUSY;
-//    hi2c->ErrorCode = HAL_I2C_ERROR_NONE;
-//    hi2c->XferOptions = I2C_NO_OPTION_FRAME;
+    /* Disable Pos */
+		DISABLE_BIT(instance->CR1,I2C_CR1_POS);
+    //CLEAR_BIT(hi2c->Instance->CR1, I2C_CR1_POS);
+		
+    //hi2c->State = HAL_I2C_STATE_BUSY;
+    //hi2c->ErrorCode = HAL_I2C_ERROR_NONE;
+    //hi2c->XferOptions = I2C_NO_OPTION_FRAME;
 
     do
     {
       /* Generate Start */
-			  I2C1->CR1 |= 1 << I2C_CR1_START_Pos;
-				
-//      SET_BIT(hi2c->Instance->CR1, I2C_CR1_START);
-
+			ENABLE_BIT(instance->CR1, I2C_CR1_START);
+      //SET_BIT(hi2c->Instance->CR1, I2C_CR1_START);
+			
       /* Wait until SB flag is set */
-//      if (I2C_WaitOnFlagUntilTimeout(hi2c, I2C_FLAG_SB, RESET, Timeout, tickstart) != HAL_OK)
-//      {
-//        if (READ_BIT(hi2c->Instance->CR1, I2C_CR1_START) == I2C_CR1_START)
-//        {
-//          hi2c->ErrorCode = HAL_I2C_WRONG_START;
-//        }
-//        return HAL_TIMEOUT;
-//      }
+      if (I2C_WaitOnFlagUntilTimeout(instance, I2C_FLAG_SB, RESET, Timeout) != 0)
+      {
+        if (Read_BIT(instance->CR1, I2C_CR1_START) == I2C_CR1_START)
+        {
+					/*проверка на ошибку*/
+          //hi2c->ErrorCode = HAL_I2C_WRONG_START;
+        }
+        //return HAL_TIMEOUT;
+				return 3;
+      }
 
       /* Send slave address */
-			I2C1->DR = (uint8_t)(DevAddress & (~I2C_OAR1_ADD0)); // I2C_7BIT_ADD_WRITE(DevAddress);
-      //hi2c->Instance->DR = I2C_7BIT_ADD_WRITE(DevAddress);
+      instance->DR = I2C_7BIT_ADD_Write(DevAddress);
 
       /* Wait until ADDR or AF flag are set */
       /* Get tick */
-      //tickstart = HAL_GetTick();
+//      tickstart = HAL_GetTick();
 
-//      tmp1 = __HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_ADDR);
-//      tmp2 = __HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_AF);
-//      while ((hi2c->State != HAL_I2C_STATE_TIMEOUT) && (tmp1 == RESET) && (tmp2 == RESET))
-//      {
+      tmp1 = I2C_GET_FLAG(instance, I2C_FLAG_ADDR);
+      tmp2 = I2C_GET_FLAG(instance, I2C_FLAG_AF);
+			
+      while ( (tmp1 == RESET) && (tmp2 == RESET))
+      {
 //        if (((HAL_GetTick() - tickstart) > Timeout) || (Timeout == 0U))
 //        {
-//          hi2c->State = HAL_I2C_STATE_TIMEOUT;
+//          //hi2c->State = HAL_I2C_STATE_TIMEOUT;
 //        }
-//        tmp1 = __HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_ADDR);
-//        tmp2 = __HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_AF);
-//      }
+        tmp1 = I2C_GET_FLAG(instance, I2C_FLAG_ADDR);
+        tmp2 = I2C_GET_FLAG(instance, I2C_FLAG_AF);
+      }
 
       //hi2c->State = HAL_I2C_STATE_READY;
 
       /* Check if the ADDR flag has been set */
-      if (I2C_AdresSetTime())
+      if (I2C_GET_FLAG(instance, I2C_FLAG_ADDR) == SET)
       {
-//        /* Generate Stop */
-//        SET_BIT(hi2c->Instance->CR1, I2C_CR1_STOP);
+        /* Generate Stop */
+				ENABLE_BIT(instance->CR1, I2C_CR1_STOP);
+        //SET_BIT(hi2c->Instance->CR1, I2C_CR1_STOP);
 
-    /* Generate Stop */
-    I2C1->CR1 |= 1 << I2C_CR1_STOP_Pos;
-
-//        /* Clear ADDR Flag */
-//        __HAL_I2C_CLEAR_ADDRFLAG(hi2c);
-
-    // сброс флага адреса
-    I2C1->SR2;
-
+        /* Clear ADDR Flag */
+        //__HAL_I2C_CLEAR_ADDRFLAG(hi2c);
+				I2C_CLEAR_ADDRFLAG(instance);
+				
         /* Wait until BUSY flag is reset */
-        //if (I2C_WaitOnFlagUntilTimeout(hi2c, I2C_FLAG_BUSY, SET, I2C_TIMEOUT_BUSY_FLAG, tickstart) != HAL_OK)
-        if(I2C_BUSYBit_SetTime()!=0)
-				{
-          return 1;
+        if (I2C_WaitOnFlagUntilTimeout(instance, I2C_FLAG_BUSY, SET, I2C_TIMEOUT_BUSY_FLAG) != 0)
+        {
+          //return HAL_ERROR;
+					return 1;
         }
 
         //hi2c->State = HAL_I2C_STATE_READY;
 
         /* Process Unlocked */
-       // __HAL_UNLOCK(hi2c);
+        //__HAL_UNLOCK(hi2c);
 
-        return 0;
+        //return HAL_OK;
+				return 0;
       }
       else
       {
-//        /* Generate Stop */
-//        SET_BIT(hi2c->Instance->CR1, I2C_CR1_STOP);
-				    /* Generate Stop */
-    I2C1->CR1 |= 1 << I2C_CR1_STOP_Pos;
+        /* Generate Stop */
+				ENABLE_BIT(instance->CR1, I2C_CR1_STOP);
+        //SET_BIT(hi2c->Instance->CR1, I2C_CR1_STOP);
+				
         /* Clear AF Flag */
-        //__HAL_I2C_CLEAR_FLAG(hi2c, I2C_FLAG_AF);
+				I2C_CLEAR_FLAG(instance,I2C_FLAG_AF);
+//        __HAL_I2C_CLEAR_FLAG(hi2c, I2C_FLAG_AF);
 
         /* Wait until BUSY flag is reset */
-				
-        
-				//if (I2C_WaitOnFlagUntilTimeout(hi2c, I2C_FLAG_BUSY, SET, I2C_TIMEOUT_BUSY_FLAG, tickstart) != HAL_OK)
-        if(I2C_BUSYBit_SetTime()!=0)
-				{
-          return 1;
+        if (I2C_WaitOnFlagUntilTimeout(instance, I2C_FLAG_BUSY, SET, I2C_TIMEOUT_BUSY_FLAG) != 0)
+        {
+          //return HAL_ERROR;
+					return 1;
         }
       }
 
@@ -539,13 +614,13 @@ int I2C_IsDeviceReady(uint16_t DevAddress, uint32_t Trials, uint32_t Timeout)
     }
     while (I2C_Trials < Trials);
 
-//    hi2c->State = HAL_I2C_STATE_READY;
+    //hi2c->State = HAL_I2C_STATE_READY;
 
-//    /* Process Unlocked */
-//    __HAL_UNLOCK(hi2c);
+    /* Process Unlocked */
+    //__HAL_UNLOCK(hi2c);
 
-		return 0;
-//    return HAL_ERROR;
+    //return HAL_ERROR;
+		return 1;
 //  }
 //  else
 //  {

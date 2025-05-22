@@ -160,6 +160,8 @@ void SSD1306_DrawFilledCircle(int16_t x0, int16_t y0, int16_t r, SSD1306_COLOR_t
 */
 void ssd1306_I2C_Init();
 
+
+
 /**
 * @brief Записывает один байт в подчиненное устройство
 * @param *I2Cx: используется I2C

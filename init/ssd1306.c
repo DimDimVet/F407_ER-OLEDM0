@@ -134,7 +134,7 @@ uint8_t SSD1306_Init(void) {
 	
 	/*Problem*/
 	/* Check if LCD connected to I2C */
-	if (I2C_IsDeviceReady(SSD1306_I2C_ADDR, 1, 20000) != 0) {
+	if (I2C_IsDeviceReady(I2C1, SSD1306_I2C_ADDR, 1, 20000) != 0) {
 		/* Return false */
 		return 0;
 	}

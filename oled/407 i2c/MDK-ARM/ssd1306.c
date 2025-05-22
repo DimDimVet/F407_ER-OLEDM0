@@ -227,13 +227,26 @@ void I2C_ENABLE(I2C_TypeDef *instance)
 }	
 
 
-
-uint8_t I2C_IsDeviceReady(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint32_t Trials, uint32_t Timeout)
+uint8_t I2C_7BIT_ADD_Write(uint8_t DevAddress)
 {
-	I2C_TypeDef *instance=hi2c->Instance;
+	return (uint8_t)(DevAddress & (~I2C_OAR1_ADD0));
+}
+
+void I2C_CLEAR_ADDRFLAG(I2C_TypeDef *instance)
+{
+	  do{                                           
+    uint32_t tmpreg = 0;               
+    tmpreg = instance->SR1;       
+    tmpreg = instance->SR2;       
+    UNUSED(tmpreg);                             
+  } while(0);
+} 	
+
+uint8_t I2C_IsDeviceReady(I2C_TypeDef *instance, uint16_t DevAddress, uint32_t Trials, uint32_t Timeout)
+{
   /* Get tick */
-  uint32_t tickstart = HAL_GetTick();
-  uint32_t I2C_Trials = 0U;
+  //uint32_t tickstart = HAL_GetTick();
+  uint32_t I2C_Trials = 0;
   FlagStatus tmp1;
   FlagStatus tmp2;
 
@@ -261,7 +274,7 @@ uint8_t I2C_IsDeviceReady(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint32_t
 		DISABLE_BIT(instance->CR1,I2C_CR1_POS);
     //CLEAR_BIT(hi2c->Instance->CR1, I2C_CR1_POS);
 		
-    hi2c->State = HAL_I2C_STATE_BUSY;
+    //hi2c->State = HAL_I2C_STATE_BUSY;
     //hi2c->ErrorCode = HAL_I2C_ERROR_NONE;
     //hi2c->XferOptions = I2C_NO_OPTION_FRAME;
 
@@ -276,6 +289,7 @@ uint8_t I2C_IsDeviceReady(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint32_t
       {
         if (Read_BIT(instance->CR1, I2C_CR1_START) == I2C_CR1_START)
         {
+					/*проверка на ошибку*/
           //hi2c->ErrorCode = HAL_I2C_WRONG_START;
         }
         //return HAL_TIMEOUT;
@@ -283,26 +297,26 @@ uint8_t I2C_IsDeviceReady(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint32_t
       }
 
       /* Send slave address */
-      hi2c->Instance->DR = I2C_7BIT_ADD_WRITE(DevAddress);
+      instance->DR = I2C_7BIT_ADD_Write(DevAddress);
 
       /* Wait until ADDR or AF flag are set */
       /* Get tick */
-      tickstart = HAL_GetTick();
+//      tickstart = HAL_GetTick();
 
-      tmp1 = __HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_ADDR);
-      tmp2 = __HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_AF);
+      tmp1 = I2C_GET_FLAG(instance, I2C_FLAG_ADDR);
+      tmp2 = I2C_GET_FLAG(instance, I2C_FLAG_AF);
 			
-      while ((hi2c->State != HAL_I2C_STATE_TIMEOUT) && (tmp1 == RESET) && (tmp2 == RESET))
+      while ( (tmp1 == RESET) && (tmp2 == RESET))
       {
-        if (((HAL_GetTick() - tickstart) > Timeout) || (Timeout == 0U))
-        {
-          hi2c->State = HAL_I2C_STATE_TIMEOUT;
-        }
-        tmp1 = __HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_ADDR);
-        tmp2 = __HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_AF);
+//        if (((HAL_GetTick() - tickstart) > Timeout) || (Timeout == 0U))
+//        {
+//          //hi2c->State = HAL_I2C_STATE_TIMEOUT;
+//        }
+        tmp1 = I2C_GET_FLAG(instance, I2C_FLAG_ADDR);
+        tmp2 = I2C_GET_FLAG(instance, I2C_FLAG_AF);
       }
 
-      hi2c->State = HAL_I2C_STATE_READY;
+      //hi2c->State = HAL_I2C_STATE_READY;
 
       /* Check if the ADDR flag has been set */
       if (I2C_GET_FLAG(instance, I2C_FLAG_ADDR) == SET)
@@ -312,8 +326,9 @@ uint8_t I2C_IsDeviceReady(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint32_t
         //SET_BIT(hi2c->Instance->CR1, I2C_CR1_STOP);
 
         /* Clear ADDR Flag */
-        __HAL_I2C_CLEAR_ADDRFLAG(hi2c);
-
+        //__HAL_I2C_CLEAR_ADDRFLAG(hi2c);
+				I2C_CLEAR_ADDRFLAG(instance);
+				
         /* Wait until BUSY flag is reset */
         if (I2C_WaitOnFlagUntilTimeout(instance, I2C_FLAG_BUSY, SET, I2C_TIMEOUT_BUSY_FLAG) != 0)
         {
@@ -321,12 +336,13 @@ uint8_t I2C_IsDeviceReady(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint32_t
 					return 1;
         }
 
-        hi2c->State = HAL_I2C_STATE_READY;
+        //hi2c->State = HAL_I2C_STATE_READY;
 
         /* Process Unlocked */
         //__HAL_UNLOCK(hi2c);
 
-        return HAL_OK;
+        //return HAL_OK;
+				return 0;
       }
       else
       {
@@ -351,12 +367,13 @@ uint8_t I2C_IsDeviceReady(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint32_t
     }
     while (I2C_Trials < Trials);
 
-    hi2c->State = HAL_I2C_STATE_READY;
+    //hi2c->State = HAL_I2C_STATE_READY;
 
     /* Process Unlocked */
     //__HAL_UNLOCK(hi2c);
 
-    return HAL_ERROR;
+    //return HAL_ERROR;
+		return 1;
 //  }
 //  else
 //  {
@@ -374,7 +391,7 @@ uint8_t SSD1306_Init(void) {
 	ssd1306_I2C_Init();
 	
 	/* Check if LCD connected to I2C */
-	if (I2C_IsDeviceReady(&hi2c1, SSD1306_I2C_ADDR, 1, 20000) != HAL_OK) {
+	if (I2C_IsDeviceReady(I2C1, SSD1306_I2C_ADDR, 1, 20000) != 0) {
 		/* Return false */
 		return 0;
 	}
